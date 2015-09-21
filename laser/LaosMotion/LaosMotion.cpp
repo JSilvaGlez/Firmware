@@ -45,6 +45,7 @@ static int ofsx=0, ofsy=0, ofsz=0;
 // Command interpreter
 int param=0, val=0;
 
+
 // Bitmap buffer
 #define BITMAP_PIXELS  (8192)
 #define BITMAP_SIZE (BITMAP_PIXELS/32)
@@ -178,7 +179,6 @@ void LaosMotion::moveToAbsolute(int x, int y, int z, int speed, int power)
   int feedrate = (speed * 60.0 * cfg->speed) / 100;
   moveToAbsoluteWithAbsoluteFeedrate(x, y, z, feedrate, power, AT_MOVE);
 }
-
 void LaosMotion::moveToRelativeToOriginWithAbsoluteFeedrate(int x, int y, int z, int feedrate, int power, eActionType actiontype)
 {
   moveToAbsoluteWithAbsoluteFeedrate(x-ofsx, y-ofsy, z-ofsz, feedrate, power, actiontype);
@@ -411,7 +411,6 @@ void LaosMotion::setPositionAbsolute(int x, int y, int z)
   m_PlannedZAbsolute = z;
   plan_set_current_position_xyz(x/1000.0,y/1000.0,z/1000.0);
 }
-
 /**
 *** get the position
 *** The result is offset by the current offset location
@@ -494,16 +493,16 @@ void LaosMotion::MakeCurrentPositionOrigin()
 **/
 void LaosMotion::home(int x, int y, int z)
 {
+  
   extern GlobalConfig *cfg;
   int i=0;
+  int Zx,Zy,Zz;
   printf("Homing %d,%d, with speed %d\n", x, y, cfg->homespeed);
-  xdir = cfg->xhomedir;
-  ydir = cfg->yhomedir;
   zdir = cfg->zhomedir;
   led1 = 0;
   isHome = false;
   printf("Home Z...\n\r");
-  if (cfg->autozhome) {
+    if (cfg->autozhome) {
     printf("Homing %d with speed %d\n", z, cfg->zhomespeed);
     while ((zmin ^ cfg->zpol) && (zmax ^ cfg->zpol)) {
         zstep = 0;
@@ -511,8 +510,16 @@ void LaosMotion::home(int x, int y, int z)
         zstep = 1;
         wait(cfg->zhomespeed/1E6);
     }
+    getCurrentPositionAbsolute(&Zx, &Zy, &Zz);
+    setOriginAbsolute(Zx, Zy, 0); // reset origin
+    setPositionAbsolute(Zx,Zy,z);
+    moveToAbsolute(Zx,Zy,z);
+    wait(5.0);
+    reset();
   }
   printf("Home XY...\n\r");
+  xdir = cfg->xhomedir;
+  ydir = cfg->yhomedir;
   while ( 1 )
   {
     xstep = ystep = 0;
@@ -526,16 +533,74 @@ void LaosMotion::home(int x, int y, int z)
     led4 = ((i++) & 0x10000);
     if ( !(xhome ^ cfg->xpol) && !(yhome ^ cfg->ypol) )
     {
+      getCurrentPositionAbsolute(&Zx, &Zy, &Zz);
       setOriginAbsolute(0, 0, 0); // reset origin
-      setPositionAbsolute(x,y,z);
+      setPositionAbsolute(x,y,0);
+      z=Zz;
       moveToAbsolute(x,y,z);
       isHome = true;
       printf("Home done.\n\r");
       return;
     }
   }
-
 }
 
+/**
+*** Autofocus the axis Z, stop when someone homeZ switches are pressed
+**/
+void LaosMotion::focus(int x, int y, int z)
+{
+  
+  extern GlobalConfig *cfg;
+  int i=0;
+  int Zx,Zy,Zz;
+  printf("Homing %d,%d, with speed %d\n", x, y, cfg->homespeed);
+  zdir = cfg->zhomedir;
+  led1 = 0;
+  isHome = false;
+  printf("Running AutoFocus %d,%d, with speed %d\n", x, y, cfg->homespeed);
+  zdir = cfg->zhomedir;
+  led1 = 0;
+  isHome = false;
+  printf("AutoFocus Z...\n\r");
+  printf("Homing %d with speed %d\n", z, cfg->zhomespeed);
+  while ((zmin ^ cfg->zpol) && (zmax ^ cfg->zpol)) {
+    zstep = 0;
+    wait(cfg->zhomespeed/1E6);
+    zstep = 1;
+    wait(cfg->zhomespeed/1E6);
+  }
+  getCurrentPositionAbsolute(&Zx, &Zy, &Zz);
+  setOriginAbsolute(Zx, Zy, 0); // reset origin
+  setPositionAbsolute(Zx,Zy,z);
+  moveToAbsolute(Zx,Zy,z);
+  wait(5.0);
+  reset();
+  printf("Home XY...\n\r");
+  xdir = cfg->xhomedir;
+  ydir = cfg->yhomedir;
+  while ( 1 )
+  {
+    xstep = ystep = 0;
+    wait(cfg->homespeed/1E6);
+    xstep = xhome ^ cfg->xpol;
+    ystep = yhome ^ cfg->ypol;
+    wait(cfg->homespeed/1E6);
 
-
+    led2 = !xhome;
+    led3 = !yhome;
+    led4 = ((i++) & 0x10000);
+    if ( !(xhome ^ cfg->xpol) && !(yhome ^ cfg->ypol) )
+    {
+      getCurrentPositionAbsolute(&Zx, &Zy, &Zz);
+      setOriginAbsolute(0, 0, 0); // reset origin
+      setPositionAbsolute(x,y,0);
+      z=Zz;
+      moveToAbsolute(x,y,z);
+      isHome = true;
+      printf("Home done.\n\r");
+      return;
+    }
+  }
+  
+}
