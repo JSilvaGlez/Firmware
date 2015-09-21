@@ -45,6 +45,7 @@ public:
   int ready(); // returns true if we are ready to accept a new instruction
   void reset(); // reset the instruction decoder and motion controller
   void home(int xhome, int yhome, int zhome); // home the system, move to the sensors and set the specified position
+  void focus(int x, int y, int z);// AUTOFOCUS the system, move to the sensors and set the specified position in Z Zrest
   bool isStart(); // start button is enabled
   bool isHome; // system is homed
   void setPositionRelativeToOrigin(int x, int y, int z);
@@ -69,3 +70,4 @@ private:
 };
 
 #endif
+
